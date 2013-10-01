@@ -16,8 +16,12 @@ INCLUDEPATH = \
 
 LIBS += -L$$TRIKCONTROL_BINDIR -ltrikControl
 
-SOURCES += main.cpp \
-    segway.cpp
+!macx {
+        QMAKE_LFLAGS += -Wl,-O1,-rpath,.
+}
 
 HEADERS += \
     segway.h
+
+SOURCES += main.cpp \
+    segway.cpp

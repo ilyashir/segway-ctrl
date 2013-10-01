@@ -16,6 +16,7 @@ class Segway : public QObject
     Q_OBJECT
 public:
     explicit Segway(QObject *parent = 0);
+    ~Segway();
 
 protected:
     void resetToZero();
@@ -31,19 +32,21 @@ private slots:
     void startStabilization();
     void prepareSegway();
     void stabilization();
+    void getVoltage();
 
 private:
     Brick brick;
     QTcpSocket *infoSocket;
     QTcpServer infoServer;
-    QTimer prepareTimer;
-    QTimer deviceTimer;
+    QTimer initTimer;
+    QTimer batteryTimer; //100ms
+    QTimer taskTimer; //4ms
 
     QSharedPointer<QSocketNotifier> keysSocket;
     int keysFd;
 
     QVector<int> gyroOriginalTilts;
-    QVector<float> meanGyro;
+    QVector<float> gyroOffsetTilts;
 
     enum { INIT_MODE,
            CALC_MODE,
@@ -51,6 +54,10 @@ private:
     } segwayState;
 
     int averageCount; /* average count to calc gyro offset */
+
+    float args_battery;
+    float args_theta_m_l;
+    float args_theta_m_r;
 
     float ud_err_theta;
     float ud_theta_ref;
@@ -62,6 +69,11 @@ private:
     float cmd_turn;
     float pwm_l;
     float pwm_r;
+
+    float pwmc;
+    float pwplus;
+    float gyroc;
+    float encodc;
 };
 
 #endif // SEGWAY_H
