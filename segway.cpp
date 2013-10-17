@@ -22,22 +22,19 @@ const float A_D = 0.8F; /* low pass filter gain for motors average count */
 const float gyroConst = 820.846931; /*Parrots to rad*/
 const float K_THETADOT = 6.25F;  /* 0.3/R*/
 const float K_PHIDOT = 25.0F;  /* turn target speed gain */
-const float K_I = -0.447213595499757F;
-const float K_F[4] = { -0.783855020175513F, -27.8085449316292F, -0.908246261210228, -2.12746939876327F };
 const float BATTERY_GAIN = 0.018504035F;	/* battery voltage gain for motor PWM outputs */
 const float BATTERY_OFFSET = 0.2112102855F;	/* battery voltage offset for motor PWM outputs */
-
-//- offset
 
 Segway::Segway(QObject *parent) :
     QObject(parent),
     segwayState(INIT_MODE),
-    averageCount(0),
-    pwmc(1.0),
-    pwplus(0.0),
-    gyroc(20.0),
-    encodc(1.0)
+    averageCount(0)
 {
+    K_F[0] = -0.783855020175513;
+    K_F[1] = -27.8085449316292;
+    K_F[2] = -0.908246261210228;
+    K_F[3] = -2.12746939876327;
+    K_I = -0.447213595499757;
     qDebug() << "INIT_MODE";
 
     gyroOriginalTilts << 0 << 0 << 0;
@@ -60,7 +57,6 @@ Segway::Segway(QObject *parent) :
         return;
     }
     connect(&infoServer, SIGNAL(newConnection()), this, SLOT(setConnection()));
-
     connect(&batteryTimer, SIGNAL(timeout()), this, SLOT(getVoltage()));
 }
 
@@ -83,6 +79,7 @@ void Segway::keysEvent()
         qDebug()<<"keys: incomplete data read";
         return;
     }
+
     if (event.type == EV_KEY)
     {
         int keyCode = static_cast<int>(event.code);
@@ -121,7 +118,7 @@ void Segway::buttonPressed()
             qDebug() << "INIT_MODE";
 
             taskTimer.stop();
-            batteryTimer.stop();
+                batteryTimer.stop();
             disconnect(&taskTimer, SIGNAL(timeout()), this, SLOT(stabilization()));
             break;
     }
@@ -185,22 +182,17 @@ void Segway::stabilization()
     QVector<int> temp = brick.gyro()->readTilts();
     gyroOriginalTilts[0] = temp[0];
 
-    args_theta_m_l = brick.encoder(3)->get() * encodc;
-    args_theta_m_r = - brick.encoder(4)->get() * encodc;
+    args_theta_m_l = brick.encoder(3)->get();
+    args_theta_m_r = - brick.encoder(4)->get();
 
 //    qDebug("left encoder: %f right encoder: %f", args_theta_m_l, args_theta_m_r);
 
     balance_control();
 
-    pwm_l *= pwmc;
-    if (pwm_l < 0.0) pwm_l -= pwplus; else pwm_l += pwplus;
-    pwm_r *= pwmc;
-    if (pwm_r < 0.0) pwm_r -= pwplus; else pwm_r += pwplus;
     int p_l = (int)pwm_l;
     int p_r = (int)pwm_r;
-    p_l = rt_SATURATE(p_l, -100, 100);
-    p_r = rt_SATURATE(p_r, -100, 100);
-//    qDebug("int PWM_L = %d int PWM_R = %d", p_l, p_r);
+
+//    qDebug("pwmL: %d pwmR: %d", p_l, p_r);
 
     brick.powerMotor("3")->setPower(p_l);
     brick.powerMotor("4")->setPower(p_r);
@@ -244,7 +236,7 @@ void Segway::balance_control()
       *  Sum: '<S4>/Sum6'
       *  UnitDelay: '<S10>/Unit Delay'
       */
-     tmp_theta = ((args_theta_m_l + ud_psi) + (args_theta_m_r + ud_psi)) * 0.5F;
+     tmp_theta = (args_theta_m_l + args_theta_m_r) * 0.5F + ud_psi;
 
 //     ud_psi=0
 //     среднее показание с энкодеров
@@ -267,9 +259,8 @@ void Segway::balance_control()
       *  Sum: '<S4>/Sum2'
       */
 
-    tmp_psidot = ((gyroOriginalTilts[0] / gyroConst) - gyroOffsetTilts[0]) * gyroc;
+    tmp_psidot = (gyroOriginalTilts[0] / gyroConst) - gyroOffsetTilts[0];
 //    qDebug("gyro delta: %f", tmp_psidot);
-//    гироскоп
 
      /* Gain: '<S2>/Gain' incorporates:
       *  Constant: '<S3>/Constant2'
@@ -291,22 +282,23 @@ void Segway::balance_control()
       *  UnitDelay: '<S5>/Unit Delay'
       *  UnitDelay: '<S7>/Unit Delay'
       */
-     tmp[0] = ud_theta_ref;
-     tmp[1] = 0.0F;
-     tmp[2] = tmp_thetadot_cmd_lpf;
-     tmp[3] = 0.0F;
-     tmp_theta_0[0] = tmp_theta;
-     tmp_theta_0[1] = ud_psi;
-     tmp_theta_0[2] = (tmp_theta_lpf - ud_theta_lpf) / EXEC_PERIOD;
-     tmp_theta_0[3] = tmp_psidot;
-     tmp_pwm_r_limiter = 0.0F;
 
-     for (int i = 0; i < 4; i++) {
-       tmp_pwm_r_limiter += (tmp[i] - tmp_theta_0[i]) * K_F[(i)];
-     }
+    tmp[0] = ud_theta_ref;
+    tmp[1] = 0.0F;
+    tmp[2] = tmp_thetadot_cmd_lpf;
+    tmp[3] = 0.0F;
+    tmp_theta_0[0] = tmp_theta;
+    tmp_theta_0[1] = ud_psi;
+    tmp_theta_0[2] = (tmp_theta_lpf - ud_theta_lpf) / EXEC_PERIOD;
+    tmp_theta_0[3] = tmp_psidot;
+    tmp_pwm_r_limiter = 0.0F;
 
-     tmp_pwm_r_limiter = (((K_I * ud_err_theta) + tmp_pwm_r_limiter) /
-                          ((BATTERY_GAIN * args_battery) - BATTERY_OFFSET)) * 100.0F;
+    for (int i = 0; i < 4; i++) {
+        tmp_pwm_r_limiter += (tmp[i] - tmp_theta_0[i]) * K_F[i];
+    }
+
+    tmp_pwm_r_limiter = (((K_I * ud_err_theta) + tmp_pwm_r_limiter) /
+                                ((BATTERY_GAIN * args_battery) - BATTERY_OFFSET)) * 100.0F;
 
      /* Gain: '<S3>/Gain2' incorporates:
       *  Constant: '<S3>/Constant1'
@@ -402,9 +394,10 @@ void Segway::readInfoData()
     QString text;
     input >> text;
     QStringList list = text.split(" ");
-    qDebug() << list.at(0) << list.at(1) << list.at(2) << list.at(3);
-    pwmc =  list.at(0).toFloat(); //5.0
-    pwplus = list.at(1).toFloat(); //2.0
-    gyroc = list.at(2).toFloat(); //1.5
-    encodc = list.at(3).toFloat(); //1.2
+    K_F[0] = list.at(0).toFloat();
+    K_F[1] = list.at(1).toFloat();
+    K_F[2] = list.at(2).toFloat();
+    K_F[3] = list.at(3).toFloat();
+    K_I = list.at(4).toFloat();
+    qDebug("%f %f %f %f %f", K_F[0], K_F[1], K_F[2], K_F[3], K_I);
 }

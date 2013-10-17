@@ -70,10 +70,8 @@ private:
     float pwm_l;
     float pwm_r;
 
-    float pwmc;
-    float pwplus;
-    float gyroc;
-    float encodc;
+    float K_F[4];
+    float K_I;
 };
 
 #endif // SEGWAY_H
