@@ -1,5 +1,4 @@
-#ifndef SEGWAY_H
-#define SEGWAY_H
+#pragma once
 
 #include <QObject>
 #include <QTcpSocket>
@@ -15,7 +14,7 @@ class Segway : public QObject
 {
     Q_OBJECT
 public:
-    explicit Segway(QObject *parent = 0);
+    explicit Segway(QThread *guiThread);
     ~Segway();
 
 protected:
@@ -73,5 +72,3 @@ private:
     float K_F[4];
     float K_I;
 };
-
-#endif // SEGWAY_H

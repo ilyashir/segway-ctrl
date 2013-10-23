@@ -1,8 +1,8 @@
-TRIKCONTROL_BINDIR = ../trikRuntime/trikControl/bin/release
+TRIKCONTROL_BINDIR = ../trikRuntime/bin/release
 TRIKCONTROL_DIR = ../trikRuntime/trikControl
 
 QT       += core
-QT       -= gui
+QT       += gui
 QT       += network
 TARGET = segwayCtrl
 CONFIG   += console

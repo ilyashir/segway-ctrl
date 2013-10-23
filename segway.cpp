@@ -25,8 +25,8 @@ const float K_PHIDOT = 25.0F;  /* turn target speed gain */
 const float BATTERY_GAIN = 0.018504035F;	/* battery voltage gain for motor PWM outputs */
 const float BATTERY_OFFSET = 0.2112102855F;	/* battery voltage offset for motor PWM outputs */
 
-Segway::Segway(QObject *parent) :
-    QObject(parent),
+Segway::Segway(QThread *guiThread) :
+    brick(*guiThread),
     segwayState(INIT_MODE),
     averageCount(0)
 {
@@ -99,8 +99,8 @@ void Segway::buttonPressed()
             resetToZero();
             brick.powerMotor("3")->setPower(0); //right motor
             brick.powerMotor("4")->setPower(0); //left motor
-            brick.encoder(3)->reset(); //left encoder
-            brick.encoder(4)->reset(); //right encoder
+            brick.encoder("3")->reset(); //left encoder
+            brick.encoder("4")->reset(); //right encoder
 
             segwayState = CALC_MODE;
             qDebug() << "CALC_MODE";
@@ -127,7 +127,7 @@ void Segway::buttonPressed()
 void Segway::prepareSegway()
 {
     QVector<int> temp;
-    temp = brick.gyro()->readTilts();
+    temp = brick.gyroscope()->read();
 
     gyroOriginalTilts[0] += temp[0];
     gyroOriginalTilts[1] += temp[1];
@@ -179,20 +179,20 @@ void Segway::stabilization()
     cmd_turn = (S8)bt_receive_buf[1];
     */
 
-    QVector<int> temp = brick.gyro()->readTilts();
+    QVector<int> temp = brick.gyroscope()->read();
     gyroOriginalTilts[0] = temp[0];
 
-    args_theta_m_l = brick.encoder(3)->get();
-    args_theta_m_r = - brick.encoder(4)->get();
+    args_theta_m_l = brick.encoder("3")->read();
+    args_theta_m_r = - brick.encoder("4")->read();
 
-//    qDebug("left encoder: %f right encoder: %f", args_theta_m_l, args_theta_m_r);
+    qDebug("left encoder: %f right encoder: %f", args_theta_m_l, args_theta_m_r);
 
     balance_control();
 
     int p_l = (int)pwm_l;
     int p_r = (int)pwm_r;
 
-//    qDebug("pwmL: %d pwmR: %d", p_l, p_r);
+    qDebug("pwmL: %d pwmR: %d", p_l, p_r);
 
     brick.powerMotor("3")->setPower(p_l);
     brick.powerMotor("4")->setPower(p_r);
@@ -260,7 +260,8 @@ void Segway::balance_control()
       */
 
     tmp_psidot = (gyroOriginalTilts[0] / gyroConst) - gyroOffsetTilts[0];
-//    qDebug("gyro delta: %f", tmp_psidot);
+
+    qDebug("gyro delta: %f", tmp_psidot);
 
      /* Gain: '<S2>/Gain' incorporates:
       *  Constant: '<S3>/Constant2'
