@@ -7,6 +7,7 @@
 #include <QSocketNotifier>
 #include <QSharedPointer>
 #include <trikControl/brick.h>
+#include <QVector3D>
 
 using namespace trikControl;
 
@@ -44,8 +45,9 @@ private:
     QSharedPointer<QSocketNotifier> keysSocket;
     int keysFd;
 
-    QVector<int> gyroOriginalTilts;
-    QVector<float> gyroOffsetTilts;
+    QVector3D gyroOriginalTilts;
+    QVector3D gyroOffsetTilts;
+    QVector3D acc;
 
     enum { INIT_MODE,
            CALC_MODE,
@@ -58,6 +60,7 @@ private:
     float args_theta_m_l;
     float args_theta_m_r;
 
+    float ud_err_psi;
     float ud_err_theta;
     float ud_theta_ref;
     float ud_thetadot_cmd_lpf;
@@ -71,4 +74,5 @@ private:
 
     float K_F[4];
     float K_I;
+    float KK_I;
 };
