@@ -17,7 +17,7 @@ INCLUDEPATH = \
 LIBS += -L$$TRIKCONTROL_BINDIR -ltrikControl
 
 !macx {
-        QMAKE_LFLAGS += -Wl,-O1,-rpath,.
+        QMAKE_LFLAGS += -Wl,-O2,-rpath,.
 }
 
 HEADERS += \

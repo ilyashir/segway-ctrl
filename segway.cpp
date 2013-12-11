@@ -20,11 +20,11 @@
 #define GYRO_TH                 0.00052F
 #define rt_SATURATE(sig,ll,ul)  (((sig) >= (ul)) ? (ul) : (((sig) <= (ll)) ? (ll) : (sig)) )
 
-
+const float FLOAT_ACCURACY = 1.0e-7;
 const float A_R = 0.996F; /* low pass filter gain for motors target count */
 const float A_D = 0.8F; /* low pass filter gain for motors average count */
 const float gyroConst = /*938.736454707F; */ 820.846931; /*Parrots to rad*/
-const float accConst = 0.000244140625; /*Parrots to m/sec2 */
+const float accConst_DO_NOT_USE = 0.000244140625; /*Parrots to m/sec2 */
 const float K_THETADOT = 6.25F;  /* 0.3/R*/
 const float K_PHIDOT = 25.0F;  /* turn target speed gain */
 const float BATTERY_GAIN = 0.024482409F;  // 0.018504035F; //old	/* battery voltage gain for motor PWM outputs */
@@ -179,9 +179,11 @@ void Segway::buttonPressed()
 void Segway::prepareSegway()
 {
     gyroOriginalTilts += fromQVector(brick.gyroscope()->read());
+    accOriginal += fromQVector(brick.accelerometer()->read());
     ++averageCount;
 }
 
+// накап
 void Segway::getVoltage()
 {
     float voltage = brick.battery()->readVoltage();
@@ -191,17 +193,42 @@ void Segway::getVoltage()
 void Segway::startStabilization()
 {
     taskTimer.stop();
+    
 
-    const float fcount = averageCount;
+    gyroOffsetTilts = gyroOriginalTilts / averageCount;
+    accOriginal.normalize();    
+    
+    QMatrix3x3 X_,XT,X;
+    X_(0,0) = accOriginal.length(); // 1 ???
+    
+    XT(0,0) = accOriginal.x();
+    XT(0,1) = accOriginal.y();
+    XT(0,2) = accOriginal.z();
 
-    gyroOffsetTilts = gyroOriginalTilts / fcount;
+    X = XT.transposed();
 
+    QMatrix4x4 temp1(X_*XT);
+    
+    bool inverted;
+    QMatrix4x4 temp2 = QMatrix4x4(X*XT).inverted(&inverted);
+        
+    accRotate = temp1 * temp2;
+    for (int i = 0; i < 4; ++i)
+      for (int j = 0; j < 4; ++j)
+      {
+        qreal & cell = accRotate(i,j);
+        if (-FLOAT_ACCURACY < cell && cell < FLOAT_ACCURACY)
+          cell = 0;
+      }
+    
+ 
     args_battery = brick.battery()->readVoltage() * 1000;
 //    qDebug() << "arg_bat:" << args_battery;
 
     segwayState = CONTROL_MODE;
     qDebug() << "CONTROL_MODE";
 
+    
     disconnect(&taskTimer, SIGNAL(timeout()), this, SLOT(prepareSegway()));
     connect(&taskTimer, SIGNAL(timeout()), this, SLOT(stabilization()));
 
@@ -233,7 +260,9 @@ void Segway::stabilization()
     
     gyroOriginalTilts = fromQVector(brick.gyroscope()->read());
 
-    acc = accConst*fromQVector(brick.accelerometer()->read());
+    QVector3D temp  = accRotate * fromQVector(brick.accelerometer()->read());
+    acc = acos (temp.x() / temp.length());
+
     qDebug() << "acc: " << acc; 
 
 #if 1
@@ -371,7 +400,7 @@ void Segway::balance_control()
     ud_theta_ref = (EXEC_PERIOD * tmp_thetadot_cmd_lpf) + ud_theta_ref;
 
 //    ugol = (1 - COMPL_K) * ((EXEC_PERIOD * tmp_psidot) + ugol) + COMPL_K * atan(-(float)acc.z()/(float)acc.x());
-    ud_psi = (1 - COMPL_K) * ((EXEC_PERIOD * tmp_psidot) + ud_psi) + COMPL_K * atan(-(float)acc.z()/(float)acc.x()); // новый угол с гироскопа
+    ud_psi = (1 - COMPL_K) * ((EXEC_PERIOD * tmp_psidot) + ud_psi) + COMPL_K * acc; // новый угол с гироскопа
 //    qDebug() << "ugol: " << ugol*180/M_PI;
 
     ud_thetadot_cmd_lpf = tmp_thetadot_cmd_lpf; //запоминаем фильтрованное значение с пульта для следующего шага
@@ -384,7 +413,8 @@ void Segway::resetToZero()
 {
     gyroOriginalTilts = QVector3D();
     gyroOffsetTilts = QVector3D();
-    acc = QVector3D();
+    acc = 0;
+    alpha_acc = QVector3D();
     averageCount = 0;
 
     ud_err_psi = 0.0F;

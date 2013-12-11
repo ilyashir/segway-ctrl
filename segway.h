@@ -8,6 +8,8 @@
 #include <QSharedPointer>
 #include <trikControl/brick.h>
 #include <QVector3D>
+#include <QMatrix3x3>
+#include <QMatrix4x4>
 
 using namespace trikControl;
 
@@ -47,7 +49,10 @@ private:
 
     QVector3D gyroOriginalTilts;
     QVector3D gyroOffsetTilts;
-    QVector3D acc;
+    QVector3D accOriginal;
+    qreal acc;
+    QVector3D alpha_acc;
+    QMatrix4x4 accRotate;
 
     enum { INIT_MODE,
            CALC_MODE,
