@@ -1,6 +1,7 @@
 #include "segway.h"
 
 #include <QStringList>
+#include <QKeyEvent>
 
 #include <cmath>
 #include <unistd.h>
@@ -30,7 +31,7 @@ const float K_PHIDOT = 25.0F;  /* turn target speed gain */
 const float BATTERY_GAIN = 0.024482409F;  // 0.018504035F; //old	/* battery voltage gain for motor PWM outputs */
 const float BATTERY_OFFSET = 31.96455651F;	/* battery voltage offset for motor PWM outputs */
 const float COMPL_K = 0.02;
-QTime GTime;
+//QTime GTime;
 float EXEC_PERIOD=0;
 float ugol = 0;
 
@@ -81,23 +82,23 @@ Segway::Segway(QThread *guiThread) :
     K_I =    -7.3245553202977; 
     KK_I = 0;
 
+    //setFocus();
+
     resetToZero();
 
     qDebug() << "INIT_MODE";
 
     qDebug("%f %f %f %f %f", K_F[0], K_F[1], K_F[2], K_F[3], K_I);
-    qDebug() << "ud_psi: " << ud_psi;
-
-    GTime.start();
-    keysFd = open("/dev/input/event0", O_SYNC, O_RDONLY);
-    if (keysFd == -1)
-    {
-        qDebug()<<"cannot open keys input file reason: "<<errno;
-    } else {
-        keysSocket = QSharedPointer<QSocketNotifier>(new QSocketNotifier(keysFd, QSocketNotifier::Read, this));
-        connect(keysSocket.data(), SIGNAL(activated(int)), this, SLOT(keysEvent()));
-        keysSocket->setEnabled(true);
-    }
+ 
+    // keysFd = open("/dev/input/event0", O_SYNC, O_RDONLY);b ///why??
+    // if (keysFd == -1)
+    // {
+    //     qDebug()<<"cannot open keys input file reason: "<<errno;
+    // } else {
+    //     keysSocket = QSharedPointer<QSocketNotifier>(new QSocketNotifier(keysFd, QSocketNotifier::Read, this));
+    //     connect(keysSocket.data(), SIGNAL(activated(int)), this, SLOT(keysEvent()));
+    //     keysSocket->setEnabled(true);
+    // }
 
     if (!infoServer.listen(QHostAddress::Any, 1234))
     {
@@ -113,31 +114,24 @@ Segway::~Segway()
 {
     batteryTimer.stop();
     taskTimer.stop();
-    close(keysFd);
-
+    
     brick.powerMotor("3")->setPower(0);
     brick.powerMotor("4")->setPower(0);
 }
 
-void Segway::keysEvent()
+void Segway::keyPressEvent(QKeyEvent *event)
 {
-    struct input_event event;
-
-    if (read(keysFd, reinterpret_cast<char*>(&event), sizeof(event)) != sizeof(event))
-    {
-        qDebug()<<"keys: incomplete data read";
-        return;
-    }
-
-    if (event.type == EV_KEY)
-    {
-        int keyCode = static_cast<int>(event.code);
-        int keyValue = static_cast<int>(event.value);
-        if ((keyCode == KEY_F3) && (keyValue == 1))
-        {
-            buttonPressed();
-        }
-    }
+  switch (event->key()) {
+    case Qt::Key_F3: {      
+      buttonPressed();
+      break;
+      }
+  default: {
+    qDebug()<<"trik";
+      QWidget::keyPressEvent(event);
+      break;
+      }
+  }
 }
 
 void Segway::buttonPressed()
@@ -183,7 +177,7 @@ void Segway::prepareSegway()
     ++averageCount;
 }
 
-// накап
+// возращает текущий вольтаж батареи
 void Segway::getVoltage()
 {
     float voltage = brick.battery()->readVoltage();
@@ -261,7 +255,8 @@ void Segway::stabilization()
     gyroOriginalTilts = fromQVector(brick.gyroscope()->read());
 
     QVector3D temp  = accRotate * fromQVector(brick.accelerometer()->read());
-    acc = acos (temp.x() / temp.length());
+    //acc = acos (temp.x() / temp.length());
+    acc = atan2f (temp.z(),sqrt(temp.y()*temp.y()+temp.x()*temp.x()));
 
     qDebug() << "acc: " << acc; 
 
@@ -285,7 +280,7 @@ void Segway::stabilization()
     int p_l = (int)pwm_l;
     int p_r = (int)pwm_r;
 
-   qDebug("pwmL: %d pwmR: %d", p_l, p_r);
+    qDebug("pwmL: %d pwmR: %d", p_l, p_r);
 //    qDebug() << "--------------------";
 
 #if 1
@@ -433,6 +428,8 @@ void Segway::resetToZero()
 
     pwm_l = 0.0;
     pwm_r = 0.0;
+
+    EXEC_PERIOD = 0;
 }
 
 void Segway::setConnection()

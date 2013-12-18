@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QWidget>
 #include <QTcpSocket>
 #include <QTcpServer>
 #include <QTimer>
@@ -8,12 +9,11 @@
 #include <QSharedPointer>
 #include <trikControl/brick.h>
 #include <QVector3D>
-#include <QMatrix3x3>
 #include <QMatrix4x4>
 
 using namespace trikControl;
 
-class Segway : public QObject
+class Segway : public QWidget
 {
     Q_OBJECT
 public:
@@ -24,11 +24,10 @@ protected:
     void resetToZero();
     void balance_control();
     void buttonPressed();
-
+    virtual void keyPressEvent(QKeyEvent *event);
 signals:
 
 private slots:
-    void keysEvent();
     void setConnection();
     void readInfoData();
     void startStabilization();
