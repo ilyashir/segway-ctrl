@@ -1,3 +1,5 @@
+QMAKE_CXXFLAGS += -std=c++11 -pg -Wno-reorder
+QMAKE_LFLAGS += -pg
 TRIKCONTROL_BINDIR = ../trikRuntime/bin/release
 TRIKCONTROL_DIR = ../trikRuntime/trikControl
 
@@ -21,7 +23,11 @@ LIBS += -L$$TRIKCONTROL_BINDIR -ltrikControl
 }
 
 HEADERS += \
-    segway.h
+    segway.h \
+    encodersReader.h \
+    stabilizer.h
 
 SOURCES += main.cpp \
-    segway.cpp
+    segway.cpp \
+    encodersReader.cpp \
+    stabilizer.cpp

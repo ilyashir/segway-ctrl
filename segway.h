@@ -10,7 +10,8 @@
 #include <trikControl/brick.h>
 #include <QVector3D>
 #include <QMatrix4x4>
-
+#include "encodersReader.h"
+#include "stabilizer.h"
 using namespace trikControl;
 
 class Segway : public QWidget
@@ -19,12 +20,18 @@ class Segway : public QWidget
 public:
     explicit Segway(QThread *guiThread);
     ~Segway();
-
+    inline QPair<float, float> readEncoders() { return qMakePair(brick.encoder("3")->read(), brick.encoder("4")->read()); }
+    void stabilization();
 protected:
     void resetToZero();
     void balance_control();
     void buttonPressed();
     virtual void keyPressEvent(QKeyEvent *event);
+
+    EncodersReader encodersReader;
+
+    Stabilizer stabilizer;
+
 signals:
 
 private slots:
@@ -32,16 +39,18 @@ private slots:
     void readInfoData();
     void startStabilization();
     void prepareSegway();
-    void stabilization();
     void getVoltage();
+    void encodersReady(QPair<float, float> data);
+    void stabilizationComplete() {}
 
-private:
+private:    
     Brick brick;
     QTcpSocket *infoSocket;
     QTcpServer infoServer;
     QTimer initTimer;
     QTimer batteryTimer; //100ms
     QTimer taskTimer; //4ms
+
 
     QSharedPointer<QSocketNotifier> keysSocket;
     int keysFd;
@@ -79,4 +88,6 @@ private:
     float K_F[4];
     float K_I;
     float KK_I;
+
+
 };
