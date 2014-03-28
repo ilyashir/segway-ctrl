@@ -1,6 +1,6 @@
 QMAKE_CXXFLAGS += -std=c++11 -pg -Wno-reorder
 QMAKE_LFLAGS += -pg
-TRIKCONTROL_BINDIR = ../trikRuntime/bin/release
+TRIKCONTROL_BINDIR = ../trikRuntime/bin/arm-release
 TRIKCONTROL_DIR = ../trikRuntime/trikControl
 
 QT       += core
@@ -14,6 +14,7 @@ TEMPLATE = app
 
 INCLUDEPATH = \
         $$PWD \
+        $$BOOST_DIR \
         $$TRIKCONTROL_DIR/include \
 
 LIBS += -L$$TRIKCONTROL_BINDIR -ltrikControl

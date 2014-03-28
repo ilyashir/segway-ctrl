@@ -42,8 +42,8 @@ inline const QVector3D fromQVector(const QVector<T> & src)
     return QVector3D(src[0], src[1], src[2]);
 }
 
-Segway::Segway(QThread *guiThread) :
-    brick(*guiThread),
+Segway::Segway(QThread *guiThread, QString configPath) :
+    brick(*guiThread, configPath),
     segwayState(INIT_MODE),
     averageCount(0),
     stabilizer(this),
@@ -122,8 +122,8 @@ Segway::~Segway()
 {
     batteryTimer.stop();
     taskTimer.stop();
-    brick.powerMotor("3")->powerOff(); //obsolete
-    brick.powerMotor("4")->powerOff(); //obsolete
+    brick.motor("3")->powerOff(); //obsolete
+    brick.motor("4")->powerOff(); //obsolete
 }
 
 void Segway::keyPressEvent(QKeyEvent *event)
@@ -147,8 +147,8 @@ void Segway::buttonPressed()
     {
       case INIT_MODE:
           resetToZero();
-          brick.powerMotor("3")->powerOff(); //right motor
-          brick.powerMotor("4")->powerOff(); //left motor
+          brick.motor("3")->powerOff(); //right motor
+          brick.motor("4")->powerOff(); //left motor
           brick.encoder("3")->reset(); //left encoder
           brick.encoder("4")->reset(); //right encoder
 
@@ -166,8 +166,8 @@ void Segway::buttonPressed()
       case CONTROL_MODE:
           segwayState = INIT_MODE;
 	        resetToZero();
-          brick.powerMotor("3")->powerOff(); //right motor
-          brick.powerMotor("4")->powerOff(); //left motor
+          brick.motor("3")->powerOff(); //right motor
+          brick.motor("4")->powerOff(); //left motor
           qDebug() << "INIT_MODE";
 
           taskTimer.stop();
@@ -300,8 +300,8 @@ void Segway::stabilization()
     clock_gettime(CLOCK_MONOTONIC, &phase3_at);
 #endif
 
-    brick.powerMotor("3")->setPower(p_l);
-    brick.powerMotor("4")->setPower(p_r);
+    brick.motor("3")->setPower(p_l);
+    brick.motor("4")->setPower(p_r);
 
 #if DEBUG_TIME
     struct timespec end_at;

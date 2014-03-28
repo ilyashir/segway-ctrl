@@ -18,7 +18,7 @@ class Segway : public QWidget
 {
     Q_OBJECT
 public:
-    explicit Segway(QThread *guiThread);
+    explicit Segway(QThread *guiThread, QString configPath);
     ~Segway();
     inline QPair<float, float> readEncoders() { return qMakePair(brick.encoder("3")->read(), brick.encoder("4")->read()); }
     void stabilization();
