@@ -14,27 +14,31 @@
 #include "stabilizer.h"
 using namespace trikControl;
 
+#define KEY_ENTER 28
+#define KEY_ESC 139
+
 class Segway : public QWidget
 {
     Q_OBJECT
 public:
     explicit Segway(QThread *guiThread, QString configPath);
     ~Segway();
-    inline QPair<float, float> readEncoders() { return qMakePair(brick.encoder("3")->read(), brick.encoder("4")->read()); }
-    void stabilization();
+    inline QPair<float, float> readEncoders() { return qMakePair(brick.encoder("JB4")->read(), brick.encoder("JB3")->read()); }
 protected:
     void resetToZero();
     void balance_control();
     void buttonPressed();
-    virtual void keyPressEvent(QKeyEvent *event);
+//    virtual void keyPressEvent(QKeyEvent *event);
 
-    EncodersReader encodersReader;
+//    EncodersReader encodersReader;
 
-    Stabilizer stabilizer;
+//    Stabilizer stabilizer;
 
 signals:
 
 private slots:
+    void stabilization();
+    void getButton(int code, int value);
     void setConnection();
     void readInfoData();
     void startStabilization();

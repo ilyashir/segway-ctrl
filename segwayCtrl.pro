@@ -24,11 +24,11 @@ LIBS += -L$$TRIKCONTROL_BINDIR -ltrikControl
 }
 
 HEADERS += \
-    segway.h \
-    encodersReader.h \
-    stabilizer.h
+    segway.h
+    #encodersReader.h \
+    #stabilizer.h
 
 SOURCES += main.cpp \
-    segway.cpp \
-    encodersReader.cpp \
-    stabilizer.cpp
+    segway.cpp
+#    encodersReader.cpp \
+#    stabilizer.cpp

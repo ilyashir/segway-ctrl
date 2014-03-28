@@ -45,9 +45,9 @@ inline const QVector3D fromQVector(const QVector<T> & src)
 Segway::Segway(QThread *guiThread, QString configPath) :
     brick(*guiThread, configPath),
     segwayState(INIT_MODE),
-    averageCount(0),
-    stabilizer(this),
-    encodersReader(this)
+    averageCount(0)
+//    stabilizer(this),
+//    encodersReader(this)
 {
  /* 
     K_F[0] = -93.813117253222; 
@@ -102,44 +102,83 @@ Segway::Segway(QThread *guiThread, QString configPath) :
     //     keysSocket->setEnabled(true);
     // }
 
-    if (!infoServer.listen(QHostAddress::Any, 1234))
-    {
-        qDebug() << "unable to start the server:" << infoServer.errorString();
-        infoServer.close();
-        return;
-    }
-    connect(&infoServer, SIGNAL(newConnection()), this, SLOT(setConnection()));
+//    if (!infoServer.listen(QHostAddress::Any, 1234))
+//    {
+//        qDebug() << "unable to start the server:" << infoServer.errorString();
+//        infoServer.close();
+//        return;
+//    }
+//    connect(&infoServer, SIGNAL(newConnection()), this, SLOT(setConnection()));
     connect(&batteryTimer, SIGNAL(timeout()), this, SLOT(getVoltage()));
 
-    stabilizer.init();
-    connect(&stabilizer.worker, SIGNAL(resultReady()), this, SLOT(stabilizationComplete(void)));
+    connect(brick.keys(), SIGNAL(buttonPressed(int,int)), this, SLOT(getButton(int,int)));
 
-    encodersReader.init();
-    connect(&encodersReader.worker, SIGNAL(resultReady(QPair<float, float>)), this, SLOT(encodersReady(QPair<float, float>)));
+
+//    stabilizer.init();
+//    connect(&stabilizer.worker, SIGNAL(resultReady()), this, SLOT(stabilizationComplete(void)));
+
+//    encodersReader.init();
+//    connect(&encodersReader.worker, SIGNAL(resultReady(QPair<float, float>)), this, SLOT(encodersReady(QPair<float, float>)));
 }
 
 Segway::~Segway()
 {
     batteryTimer.stop();
     taskTimer.stop();
-    brick.motor("3")->powerOff(); //obsolete
-    brick.motor("4")->powerOff(); //obsolete
+    brick.motor("M1")->powerOff(); //obsolete
+    brick.motor("JM3")->powerOff(); //obsolete
 }
 
-void Segway::keyPressEvent(QKeyEvent *event)
+//void Segway::keyPressEvent(QKeyEvent *event)
+//{
+//  int p = event->key();
+//  switch (p) {
+//    case Qt::Key_F2: {
+//      qDebug()<<"press Esc";
+//      buttonPressed();
+//      break;
+//      }
+//  default: {
+//    qDebug()<<"trik " << p << Qt::Key_F2;
+//      QWidget::keyPressEvent(event);
+//      break;
+//      }
+//  }
+//}
+
+void Segway::getButton(int code, int value)
 {
-  switch (event->key()) {
-    case Qt::Key_F3: {      
-      buttonPressed();
-      break;
-      }
-  default: {
-    qDebug()<<"trik";
-      QWidget::keyPressEvent(event);
-      break;
-      }
-  }
+    if (value != 1)
+      return;
+
+    switch (code) {
+    case KEY_ENTER:
+        qDebug()<<"press Enter";
+        buttonPressed();
+        break;
+    case 139:
+        qDebug()<<"press Esc";
+        segwayState = INIT_MODE;
+        resetToZero();
+
+//        stabilizer.stop();
+//        encodersReader.stop();
+        batteryTimer.stop();
+
+        brick.motor("M1")->powerOff(); //right motor
+        brick.motor("JM3")->powerOff(); //left motor
+
+        taskTimer.stop();
+        qDebug() << "INIT_MODE";
+
+        break;
+    default:
+        qDebug()<<"no key" << code;
+        break;
+    }
+
 }
+
 
 void Segway::buttonPressed()
 {
@@ -147,10 +186,10 @@ void Segway::buttonPressed()
     {
       case INIT_MODE:
           resetToZero();
-          brick.motor("3")->powerOff(); //right motor
-          brick.motor("4")->powerOff(); //left motor
-          brick.encoder("3")->reset(); //left encoder
-          brick.encoder("4")->reset(); //right encoder
+          brick.motor("M1")->powerOff(); //right motor
+          brick.motor("JM3")->powerOff(); //left motor
+          brick.encoder("JB4")->reset(); //left encoder
+          brick.encoder("JB3")->reset(); //right encoder
 
           segwayState = CALC_MODE;
           qDebug() << "CALC_MODE";
@@ -165,15 +204,20 @@ void Segway::buttonPressed()
       case CALC_MODE:
       case CONTROL_MODE:
           segwayState = INIT_MODE;
-	        resetToZero();
-          brick.motor("3")->powerOff(); //right motor
-          brick.motor("4")->powerOff(); //left motor
-          qDebug() << "INIT_MODE";
+          resetToZero();
+
+//          stabilizer.stop();
+//          encodersReader.stop();
+          batteryTimer.stop();
+
+
+          brick.motor("M1")->powerOff(); //right motor
+          brick.motor("JM3")->powerOff(); //left motor
 
           taskTimer.stop();
-          batteryTimer.stop();
-          stabilizer.stop();
-          encodersReader.stop();
+          qDebug() << "INIT_MODE";
+
+
           break;
     }
 }
@@ -232,22 +276,23 @@ void Segway::startStabilization()
 
     
     disconnect(&taskTimer, SIGNAL(timeout()), this, SLOT(prepareSegway()));
-
+    connect(&taskTimer, SIGNAL(timeout()), this, SLOT(stabilization()));
     batteryTimer.start(1000);
-    stabilizer.start(5);
-    encodersReader.start(5);
+    taskTimer.start(4);
+//    stabilizer.start(5);
+//    encodersReader.start(5);
 
 }
 
 void Segway::encodersReady(QPair<float, float> data) {
     args_theta_m_l = -data.first;
-    args_theta_m_r = data.second;
+    args_theta_m_r = data.second; 
 }
 
 void Segway::stabilization()
 {
 
-#define DEBUG_TIME 1
+#define DEBUG_TIME 0
 
 #if DEBUG_TIME
     static struct timespec last_start_at;
@@ -273,12 +318,16 @@ void Segway::stabilization()
     QVector3D temp  = accRotate * fromQVector(brick.accelerometer()->read());
     
     acc = atan2f (temp.z(),sqrt(temp.y()*temp.y()+temp.x()*temp.x()));
+    qDebug() << "acc" << acc;
 
 
 #if DEBUG_TIME
     struct timespec phase1_at;
     clock_gettime(CLOCK_MONOTONIC, &phase1_at);
 #endif
+
+    args_theta_m_l = -brick.encoder("JB4")->read();
+    args_theta_m_r = brick.encoder("JB3")->read();
 
 #if DEBUG_TIME
     struct timespec phase2_at;
@@ -300,8 +349,9 @@ void Segway::stabilization()
     clock_gettime(CLOCK_MONOTONIC, &phase3_at);
 #endif
 
-    brick.motor("3")->setPower(p_l);
-    brick.motor("4")->setPower(p_r);
+    brick.motor("M1")->setPower(p_l);
+    brick.motor("JM3")->setPower(p_r);
+
 
 #if DEBUG_TIME
     struct timespec end_at;
@@ -367,7 +417,7 @@ void Segway::balance_control()
     tmp[3] = 0.0F;
     tmp_theta_0[0] = tmp_theta;		// угол 
     tmp_theta_0[1] = ud_psi;		// 
-    //qDebug() << "ud_psi(deg) = " << ud_psi*180/M_PI;
+    qDebug() << "ud_psi(deg) = " << ud_psi*180/M_PI;
     tmp_theta_0[2] = (tmp_theta_lpf - ud_theta_lpf) / EXEC_PERIOD;	//скорость моторов (рад/c)
     tmp_theta_0[3] = tmp_psidot;
     tmp_pwm_r_limiter = 0.0F;
@@ -394,7 +444,7 @@ void Segway::balance_control()
 
     tmp_pwm_l_limiter = rt_SATURATE(tmp_pwm_l_limiter, -100.0F, 100.0F);
 
-    pwm_l = 0; //- tmp_pwm_l_limiter;
+    pwm_l = tmp_pwm_l_limiter;
 
     tmp_pwm_r_limiter -= tmp_pwm_turn;
 
@@ -402,7 +452,7 @@ void Segway::balance_control()
 
 //    qDebug() << "pwm_r_limiter: " << tmp_pwm_r_limiter << "pwm_l_limiter: " << tmp_pwm_l_limiter;
 
-    pwm_r = 0; //- tmp_pwm_r_limiter;
+    pwm_r = - tmp_pwm_r_limiter;
 
     ud_err_theta = ((ud_theta_ref - tmp_theta) * EXEC_PERIOD) + ud_err_theta; //новая ошибка энкодеров
 //    qDebug() << "ud_theta_ref:" << ud_theta_ref << "ud_err_theta" << ud_err_theta;
